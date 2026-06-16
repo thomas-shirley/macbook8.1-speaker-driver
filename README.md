@@ -1,9 +1,13 @@
 # MacBook8,1 (12-inch, Early 2015) — built-in speaker driver
 
 Makes the internal speakers work on Linux for the 12" MacBook (MacBook8,1, A1534,
-Cirrus Logic **CS4208** codec driving a TDM class-D amplifier).
+Cirrus Logic **CS4208** codec driving a TDM class-D amplifier). This took around 3 months of persistent testing/ chatting with Claude, plus a mountain of manual verification to iterate over and over, before converging on a solution. Three different patches were actually required, with some pipewire configs in the mix too.
 
-> **Status: SOLVED, SHIPPED, cold-boot-clean.** The full kernel driver stack
+Note: I have no prior experience with drivers, so this has been a learning curve - there are still plenty of gaps in my knowledge and plenty I don't actually understand. But I love the form factor of this laptop and the quality of the industrial design, so I'm pleased to keep it going.
+
+Switching between speakers & headphones is still wonky, I'm working on that. There is currently a systemd unit to handle switching between headphone jack and the speakers, so we don't end up with silence again after pulling out the jack.
+
+> The full kernel driver stack
 > plays the built-in speakers through normal PipeWire on every plain reboot, with
 > no manual steps. Validated end-to-end on kernel 6.17 (Ubuntu) via DKMS.
 

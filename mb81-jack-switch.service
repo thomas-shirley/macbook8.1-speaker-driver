@@ -1,0 +1,14 @@
+[Unit]
+Description=MacBook8,1 headphone jack auto-switch (CS4208)
+# Needs the user PipeWire/WirePlumber session to be up.
+After=wireplumber.service pipewire.service
+Wants=wireplumber.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mb81-jack-switch
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

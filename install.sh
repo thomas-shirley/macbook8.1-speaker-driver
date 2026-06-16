@@ -28,10 +28,23 @@ action='install'
 # in their per-user config dirs, not root's.
 real_user="${SUDO_USER:-$USER}"
 real_home="$(getent passwd "$real_user" | cut -d: -f6)"
+real_uid="$(id -u "$real_user")"
 pw_dir="$real_home/.config/pipewire/pipewire.conf.d"
 wp_dir="$real_home/.config/wireplumber/wireplumber.conf.d"
 
+# Run `systemctl --user` as the invoking user, against their session bus.
+user_systemctl() {
+    sudo -u "$real_user" \
+        XDG_RUNTIME_DIR="/run/user/$real_uid" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$real_uid/bus" \
+        systemctl --user "$@"
+}
+
 if [[ $action == 'remove' ]]; then
+    echo "=== removing headphone jack-switch service ==="
+    user_systemctl disable --now mb81-jack-switch.service 2>/dev/null || true
+    rm -f /etc/systemd/user/mb81-jack-switch.service /usr/local/bin/mb81-jack-switch
+    user_systemctl daemon-reload 2>/dev/null || true
     echo "=== removing DKMS package ==="
     bash dkms.sh -r || true
     echo "=== removing config files ==="
@@ -56,6 +69,18 @@ install -m 0644 -o "$real_user" -g "$real_user" \
 # Remove the legacy iec958-disable rule if a previous install left it (its job
 # is now folded into 51-mb81-rawpcm-speaker.conf, which disables device 1).
 rm -f "$wp_dir/51-mb81-disable-iec958.conf"
+
+echo "=== headphone jack auto-switch (user service) ==="
+install -m 0755 mb81-jack-switch.sh /usr/local/bin/mb81-jack-switch
+install -m 0644 mb81-jack-switch.service /etc/systemd/user/mb81-jack-switch.service
+if [[ -d "/run/user/$real_uid" ]]; then
+    user_systemctl daemon-reload || true
+    user_systemctl enable --now mb81-jack-switch.service || true
+    echo "    jack-switch service enabled for $real_user"
+else
+    echo "    NOTE: no active session for $real_user; enable it after next login with:"
+    echo "          systemctl --user enable --now mb81-jack-switch.service"
+fi
 
 echo "=== clearing stale standalone module copies (so DKMS's updates/dkms wins) ==="
 # Earlier manual install.*.driver.sh runs put these directly in updates/, which
