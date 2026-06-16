@@ -3,7 +3,7 @@
 Makes the internal speakers work on Linux for the 12" MacBook (MacBook8,1, A1534,
 Cirrus Logic **CS4208** codec driving a TDM class-D amplifier). This took around 3 months of persistent testing/ chatting with Claude, plus a mountain of manual verification to iterate over and over, before converging on a solution. Three different patches were actually required, with some pipewire configs in the mix too.
 
-Note: I have no prior experience with drivers, so this has been a learning curve - there are still plenty of gaps in my knowledge and plenty I don't actually understand. But I love the form factor of this laptop and the quality of the industrial design, so I'm pleased to keep it going.
+Note: I have no prior experience with drivers, so this has been a learning curve - there are still plenty of gaps in my knowledge and plenty I don't actually understand. But I love the form factor of this laptop and the quality of the industrial design, so I'm pleased to keep it going. The majority of this code was written by Claude. The scope of the project is outside my skillset.
 
 Switching between speakers & headphones is still wonky, I'm working on that. There is currently a systemd unit to handle switching between headphone jack and the speakers, so we don't end up with silence again after pulling out the jack.
 
@@ -149,4 +149,4 @@ git-ignored.
 
 Built on davidjo's [snd_hda_macbookpro](https://github.com/davidjo/snd_hda_macbookpro)
 and leifliddy's [macbook12-audio-driver](https://github.com/leifliddy/macbook12-audio-driver),
-extended for MacBook8,1's TDM speaker path and EFI clock-state quirks.
+extended for MacBook8,1's TDM speaker path and EFI clock-state quirks. The majority of this code was written by Claude. The scope of the project is outside my skillset.
