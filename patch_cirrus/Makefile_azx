@@ -1,0 +1,9 @@
+# Out-of-tree build of ONLY snd-hda-intel.ko with the MacBook8,1 no-reset patch.
+# Dropped into build/hda/controllers/ as its Makefile by install.azx.driver.sh.
+# tegra/acpi controllers are intentionally not built (obj-m has intel only).
+
+subdir-ccflags-y += -I$(src)/../common
+CFLAGS_intel.o := -I$(src)
+
+snd-hda-intel-y := intel.o
+obj-m += snd-hda-intel.o

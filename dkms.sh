@@ -1,0 +1,35 @@
+#!/bin/bash
+
+src_dir='/usr/src/macbook12-audio-0.1'
+dkms_name='macbook12-audio/0.1'
+var_dkms_dir='/var/lib/dkms/macbook12-audio'
+cur_dir=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
+
+# specify uninstall with the -r or -u argument
+while getopts :ru arg
+do
+    case "${arg}" in
+        r) dkms_remove=true;;
+        u) dkms_remove=true;;
+    esac
+done
+
+if [[ $dkms_remove = true ]]; then
+    [[ -e $var_dkms_dir ]] && rm -rf $var_dkms_dir && echo "removed $var_dkms_dir"
+    [[ -e $src_dir ]] && rm -f $src_dir && echo "removed $src_dir"
+    exit 0
+fi
+
+pushd $cur_dir > /dev/null
+
+# Clear any stale DKMS state from a previous install before (re)building.
+# `dkms install --force` only forces re-INSTALL, not a re-BUILD: if a build
+# already exists for this kernel it reuses it. An earlier single-module build
+# (PRE_BUILD=install.cirrus.driver.sh) therefore leaves a module dir with only
+# cs420x, and the current 3-module dkms.conf fails with
+# "Missing module snd-hda-codec-generic". Nuke the tree so the build is fresh.
+[[ -e $var_dkms_dir ]] && rm -rf $var_dkms_dir && echo "cleared stale $var_dkms_dir"
+[[ ! -e $src_dir ]] && ln -sfn $cur_dir $src_dir
+dkms install -c dkms.conf --force -m $dkms_name
+
+popd > /dev/null
