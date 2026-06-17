@@ -121,6 +121,21 @@ speaker-test -c2 -t sine -f 440 -D pipewire 2>/dev/null
 A correct boot shows codec coef `0x1f = 0x0` (clock locked) end to end; a broken
 boot shows `0x1f = 0x400` (latched clock fault) and silence. See `HOW_IT_WORKS.md`.
 
+### Suspend / resume
+
+S3 resume brings the controller back through a reset that re-latches the codec
+clock (`0x1f = 0x400`), and a *bound* driver cannot clear it — so without help,
+audio returns silent after a suspend. `mb81-resume-recover.service` runs on every
+resume and performs the driverless heal (unload the HDA stack so the codec sits
+unowned → `efi_recover.py` D3hot→D0 + EFI replay → re-attach the patched driver),
+then restarts PipeWire and the jack-switch monitor. To recover by hand:
+
+```bash
+sudo bash resume_recover.sh    # or: sudo /usr/local/bin/mb81-resume-recover
+```
+
+A plain reboot is always a clean fallback.
+
 ---
 
 ## Layout
@@ -136,6 +151,9 @@ Makefile_cs420x / Makefile_cirrus   out-of-tree build makefiles (6.17+ / older)
 mb81-singlecmd.conf            modprobe.d: single_cmd=1 power_save=0   (part B)
 51-macbook81-speaker.conf      PipeWire EQ filter-chain sink
 51-mb81-rawpcm-speaker.conf    WirePlumber raw-PCM speaker node + SPDIF disable
+resume_recover.sh              driverless re-heal after suspend (-> /usr/local/bin)
+efi_recover.py                 D3hot->D0 + EFI replay; clears the clock latch
+mb81-resume-recover.service    runs resume_recover on every resume
 patch_cirrus/                  C sources for the three module patches
 HOW_IT_WORKS.md                deep dive: the bugs and the four-part fix
 ```

@@ -11,6 +11,10 @@
 #       51-mb81-rawpcm-speaker.conf -> ~/.config/wireplumber/wireplumber.conf.d/
 #           (raw-PCM mode: WirePlumber creates MacBook_Speaker_Raw for device 2
 #            event-driven so it survives the cold-boot timing race)
+# plus the suspend/resume recovery (S3 resume re-latches the codec clock; a bound
+# driver cannot clear it, so audio returns silent):
+#       resume_recover.sh + efi_recover.py -> /usr/local/bin/
+#       mb81-resume-recover.service -> /etc/systemd/system/ (runs on every resume)
 #
 # Run:  sudo bash install.sh
 # Remove: sudo bash install.sh -r
@@ -41,6 +45,11 @@ user_systemctl() {
 }
 
 if [[ $action == 'remove' ]]; then
+    echo "=== removing suspend/resume recovery service ==="
+    systemctl disable --now mb81-resume-recover.service 2>/dev/null || true
+    rm -f /etc/systemd/system/mb81-resume-recover.service \
+          /usr/local/bin/mb81-resume-recover /usr/local/bin/efi_recover.py
+    systemctl daemon-reload 2>/dev/null || true
     echo "=== removing headphone jack-switch service ==="
     user_systemctl disable --now mb81-jack-switch.service 2>/dev/null || true
     rm -f /etc/systemd/user/mb81-jack-switch.service /usr/local/bin/mb81-jack-switch
@@ -81,6 +90,15 @@ else
     echo "    NOTE: no active session for $real_user; enable it after next login with:"
     echo "          systemctl --user enable --now mb81-jack-switch.service"
 fi
+
+echo "=== suspend/resume recovery (re-heals the codec clock latch on every wake) ==="
+install -m 0755 resume_recover.sh /usr/local/bin/mb81-resume-recover
+# efi_recover.py is invoked from the same dir as the script; keep them co-located.
+install -m 0755 efi_recover.py /usr/local/bin/efi_recover.py
+install -m 0644 mb81-resume-recover.service /etc/systemd/system/mb81-resume-recover.service
+systemctl daemon-reload || true
+systemctl enable mb81-resume-recover.service || true
+echo "    mb81-resume-recover.service enabled (runs on every resume)"
 
 echo "=== clearing stale standalone module copies (so DKMS's updates/dkms wins) ==="
 # Earlier manual install.*.driver.sh runs put these directly in updates/, which

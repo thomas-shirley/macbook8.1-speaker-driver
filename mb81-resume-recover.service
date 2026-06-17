@@ -1,0 +1,16 @@
+# mb81-resume-recover.service — re-heal the CS4208 speaker after every resume.
+#
+# S3 resume re-induces the codec clock latch (coef 0x1f=0x400) and a bound driver
+# cannot clear it, so audio comes back silent. This oneshot runs on the far side
+# of every sleep target (suspend/hibernate/etc.) and performs the driverless
+# unload->efi_recover->re-attach heal. Installed + enabled by install.sh.
+[Unit]
+Description=MacBook8,1 CS4208 speaker recovery after suspend/resume
+After=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mb81-resume-recover
+
+[Install]
+WantedBy=suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
