@@ -61,7 +61,10 @@ fi
 echo "    00:1b.0 unowned; PCH clock-gate window (2 s)..."; sleep 2
 
 echo "=== 3/5: driverless heal — efi_recover.py (clears 0x1f latch + EFI replay) ==="
-python3 "$HERE/efi_recover.py" || { echo "FAIL: efi_recover.py errored — reboot to recover."; exit 1; }
+# MB81_VERIFY_TONE=0: skip efi_recover's 4 s self-test tone — it's just noise on
+# every resume. The coef 0x1f readback (step 4) is the real check, and the driver
+# re-attach is what produces actual audio.
+MB81_VERIFY_TONE=0 python3 "$HERE/efi_recover.py" || { echo "FAIL: efi_recover.py errored — reboot to recover."; exit 1; }
 
 echo "=== 4/5: re-attach the patched driver (no-reset + single_cmd, like boot) ==="
 modprobe snd_hda_intel

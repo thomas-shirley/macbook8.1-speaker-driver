@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # efi_recover.py — driverless recovery for a chime-cap boot after a failed
 # driver experiment: controller PCI D3hot->D0 cycle (BCLK interruption clears
-# the latched clock fault), full EFI state replay, 4 s verification tone,
-# then back to post-chime state. Proven procedure (efi_driver_emul.py S5).
+# the latched clock fault), full EFI state replay, optional 4 s verification tone
+# (set MB81_VERIFY_TONE=0 to skip it — the resume service does), then back to
+# post-chime state. Proven procedure (efi_driver_emul.py S5).
 #
 # If snd_hda_intel is loaded, first (as root):
 #   systemctl --user -M thomas@ stop wireplumber pipewire pipewire-pulse
@@ -211,6 +212,14 @@ replay_regs()
 print(f"coef 0x1f after EFI replay = 0x{rdcoef(0x1f):04x}", flush=True)
 
 # --- verification tone ---
+# Skipped when MB81_VERIFY_TONE=0 (the automated resume service sets this) so the
+# heal is silent: the coef 0x1f readback above is the real check, and the driver
+# re-attach afterwards is what produces actual audio. Manual diagnostic runs leave
+# the var unset and still get the audible 4 s confirmation tone.
+if os.environ.get("MB81_VERIFY_TONE", "1") == "0":
+    print("verification tone skipped (MB81_VERIFY_TONE=0); recovery done, codec "
+          "back to post-chime state on exit.", flush=True)
+    sys.exit(0)
 total = (1 + N_PAGES) * PAGE
 buf = mmap.mmap(-1, total)
 buf.write(b"\x00" * total)
