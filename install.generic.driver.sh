@@ -44,6 +44,18 @@ import sys
 src, dst = sys.argv[1], sys.argv[2]
 s = open(src).read()
 
+# MacBook8,1 CS4208 vendor id: defined once at file scope, just above the
+# function, so the body below carries no magic number.
+fn = '''int snd_hda_gen_init(struct hda_codec *codec)
+{'''
+fn_new = '''/* MacBook8,1 Cirrus CS4208 codec vendor id (see HDA_CODEC_ENTRY in patch_cirrus.c). */
+#define MB81_CS4208_VENDOR_ID 0x10134208
+
+int snd_hda_gen_init(struct hda_codec *codec)
+{'''
+assert s.count(fn) == 1, "snd_hda_gen_init definition anchor count != 1"
+s = s.replace(fn, fn_new, 1)
+
 # Original body (exact, tab-indented) -> CS4208-patched body.
 old = '''	init_multi_out(codec);
 	init_extra_out(codec);
@@ -56,11 +68,11 @@ old = '''	init_multi_out(codec);
 new = '''	init_multi_out(codec);
 	init_extra_out(codec);
 	init_multi_io(codec);
-	/* MB81 FIX: on the CS4208 (0x10134208) the ADC/loopback input paths share
-	 * the PLL clock domain with the TDM speaker DAC; bringing these (unused on
-	 * this speaker-out-only machine) up knocks the EFI-locked PLL out of lock
-	 * and latches coef 0x1f bit10 -> silent speakers. Skip them. */
-	if (codec->core.vendor_id != 0x10134208) {
+	/* MB81 FIX: on the CS4208 the ADC/loopback input paths share the PLL clock
+	 * domain with the TDM speaker DAC; bringing these (unused on this
+	 * speaker-out-only machine) up knocks the EFI-locked PLL out of lock and
+	 * latches coef 0x1f bit10 -> silent speakers. Skip them. */
+	if (codec->core.vendor_id != MB81_CS4208_VENDOR_ID) {
 		init_aamix_paths(codec);
 		init_analog_input(codec);
 		init_input_src(codec);
@@ -70,7 +82,7 @@ new = '''	init_multi_out(codec);
 	 * converter config during bring-up glitches the TDM serializer with no
 	 * register trace -> speakers silent. efi_chime_play (which PLAYS) never
 	 * touches dig1, so leave 0x0a in EFI's chime state for the CS4208. */
-	if (codec->core.vendor_id != 0x10134208)
+	if (codec->core.vendor_id != MB81_CS4208_VENDOR_ID)
 		init_digital(codec);
 '''
 assert s.count(old) == 1, "gen_init body anchor count != 1"
