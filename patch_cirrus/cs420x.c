@@ -307,6 +307,19 @@ static int cs_init(struct hda_codec *codec)
 		 * the codec PLL out of lock (coef 0x1f latches 0x400 -> silence). */
 		play_macbook81(codec);
 		mb81_dfet_power_up(codec);
+
+		/* Internal mic. The generic input-path init (init_analog_input/
+		 * init_input_src) is deliberately skipped for CS4208 because it
+		 * latches the shared ADC/DAC PLL (coef 0x1f=0x400 -> silent
+		 * speakers). Re-enable just the internal-mic capture path with two
+		 * direct verbs AFTER bring-up, which was verified not to latch:
+		 * pin 0x19 (Fixed Int mic) input-enable, and point ADC 0x06's mux
+		 * (the converter the capture PCM uses) at it (connection index 2).
+		 * ADC 0x06's input amps are already unmuted at max. */
+		snd_hda_codec_write(codec, 0x19, 0,
+				    AC_VERB_SET_PIN_WIDGET_CONTROL, PIN_IN);
+		snd_hda_codec_write(codec, 0x06, 0,
+				    AC_VERB_SET_CONNECT_SEL, 0x02);
 	} else if (spec->gpio_mask) {
 		if (spec->vendor_nid == CS4208_VENDOR_NID) {
 			snd_hda_codec_write(codec, 0x01, 0,
