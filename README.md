@@ -121,6 +121,48 @@ speaker-test -c2 -t sine -f 440 -D pipewire 2>/dev/null
 A correct boot shows codec coef `0x1f = 0x0` (clock locked) end to end; a broken
 boot shows `0x1f = 0x400` (latched clock fault) and silence. See `HOW_IT_WORKS.md`.
 
+### EFI startup audio / NVRAM check
+
+This driver is designed to attach to the audio state that EFI has established at
+boot. On a MacBook8,1 tested with Ubuntu 26.04.1, a muted EFI startup sound was
+stored in the Apple `SystemAudioVolume` NVRAM variable as `0xee`. Clearing its
+mute bit to `0x6e` restored the audible startup chime; after a cold boot, the
+unmodified driver worked normally.
+
+This is a useful diagnostic and a way to restore the known-good chime-cap boot
+state. It is **not** yet evidence that every MacBook8,1 with a muted chime skips
+the same EFI initialisation, and it is not a supported silent-boot replacement.
+
+First inspect the variable (this is read-only):
+
+```bash
+sudo efivar \
+  --name 7c436110-ab2a-4bbb-a880-fe41995c9f82-SystemAudioVolume \
+  --print
+```
+
+On the tested machine this showed a one-byte value of `ee`. If your machine
+shows that same value and you want to restore startup sound, use `efivar` rather
+than writing the efivarfs file directly:
+
+```bash
+printf '\x6e' > /tmp/SystemAudioVolume.bin
+sudo efivar \
+  --name 7c436110-ab2a-4bbb-a880-fe41995c9f82-SystemAudioVolume \
+  --write \
+  --datafile /tmp/SystemAudioVolume.bin
+sudo efivar \
+  --name 7c436110-ab2a-4bbb-a880-fe41995c9f82-SystemAudioVolume \
+  --print
+sudo poweroff
+```
+
+Power the machine on again and listen for the chime. This changes persistent
+firmware configuration. Do not substitute `0x6e` for an unknown value: it is the
+tested `0xee` value with only its mute bit cleared. Leave
+`SystemAudioVolumeDB` unchanged. A proper silent-boot initialisation path remains
+an open investigation.
+
 ### Suspend / resume
 
 S3 resume brings the controller back through a reset that re-latches the codec
