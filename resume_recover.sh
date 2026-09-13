@@ -39,7 +39,22 @@ echo "=== 1/5: release PipeWire + the jack-switch monitor (both hold the PCM) ==
 # open — it pins the module and must be stopped before the codec can sit unowned.
 run_user systemctl --user stop mb81-jack-switch.service 2>/dev/null
 run_user systemctl --user stop $PWUNITS 2>/dev/null
-sleep 1
+
+# Stopping user units is asynchronous.  Do not unload snd_hda_intel until all
+# ALSA device users have actually released their file descriptors; otherwise
+# the PCH controller remains bound and the driverless EFI recovery cannot run.
+echo "    waiting for ALSA devices to be released..."
+for _ in {1..20}; do
+    if ! fuser /dev/snd/* >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.25
+done
+if fuser /dev/snd/* >/dev/null 2>&1; then
+    echo "FAIL: sound devices still busy:"
+    fuser -v /dev/snd/* 2>&1
+    exit 1
+fi
 
 echo "=== 2/5: unload the whole HDA stack so 00:1b.0 sits UNOWNED ==="
 # HDMI audio on 00:03.0 also holds snd_hda_intel — unbind it first.
