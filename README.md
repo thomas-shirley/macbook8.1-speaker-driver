@@ -150,7 +150,8 @@ install.azx.driver.sh          builds patched snd-hda-intel       (part A)
 Makefile_cs420x / Makefile_cirrus   out-of-tree build makefiles (6.17+ / older)
 mb81-singlecmd.conf            modprobe.d: single_cmd=1 power_save=0   (part B)
 51-macbook81-speaker.conf      PipeWire EQ filter-chain sink
-51-mb81-rawpcm-speaker.conf    WirePlumber raw-PCM speaker node + SPDIF disable
+51-mb81-rawpcm-speaker.conf    WirePlumber raw-PCM speaker node + SPDIF disable + node names
+91-mb81-no-spdif-share.rules   udev: keeps "IEC958 Default PCM" off (speaker silence, #8)
 resume_recover.sh              driverless re-heal after suspend (-> /usr/local/bin)
 efi_recover.py                 D3hot->D0 + EFI replay; clears the clock latch
 mb81-resume-recover.service    runs resume_recover on every resume

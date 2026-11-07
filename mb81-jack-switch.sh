@@ -50,10 +50,35 @@ jack_state() {
         | sed -n 's/.*: values=\(on\|off\).*/\1/p' | head -1
 }
 
-# Set the default audio sink by node.name (same metadata key wpctl writes).
+current_default() {
+    wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null \
+        | sed -n 's/.*node\.name = "\(.*\)"/\1/p' | head -1
+}
+
+# Set the default audio sink by node.name (same metadata key wpctl writes), and
+# keep re-applying until WirePlumber actually reports it. Right after login or a
+# WirePlumber restart the "default" metadata object is not ready yet, so a single
+# write is silently lost and WirePlumber restores its remembered sink — usually
+# the headphone sink saved on the last plug-in — leaving the speakers "muted"
+# after an unplug or a reboot. Waiting for $SPK_SINK proves nothing: the EQ
+# filter-chain sink lives in PipeWire and never goes away. After the default
+# reads back correctly, check once more a second later so a late restore by
+# WirePlumber is caught too.
 set_default() {
-    pw-metadata -n default 0 default.configured.audio.sink \
-        "{ \"name\": \"$1\" }" >/dev/null 2>&1
+    local want="$1" cur=""
+    for _ in $(seq 1 40); do
+        pw-metadata -n default 0 default.configured.audio.sink \
+            "{ \"name\": \"$want\" }" >/dev/null 2>&1
+        sleep 0.25
+        cur="$(current_default)"
+        if [[ "$cur" == "$want" ]]; then
+            sleep 1
+            cur="$(current_default)"
+            [[ "$cur" == "$want" ]] && return 0
+        fi
+    done
+    log "WARNING: default sink did not stick to $want (now: ${cur:-none})"
+    return 1
 }
 
 node_exists() {
