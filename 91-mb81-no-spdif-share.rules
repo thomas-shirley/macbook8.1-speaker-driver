@@ -1,0 +1,13 @@
+# MacBook8,1 CS4208: keep ALSA's "IEC958 Default PCM Playback Switch" off.
+#
+# The generic parser registers converter 0x0a (the TDM speaker converter) as the
+# S/PDIF dig-out. With this switch on (the driver's default on every load),
+# preparing the analog/headphone PCM clones its format and stream tag onto 0x0a
+# (snd_hda_multi_out_analog_prepare with share_spdif), so 0x0a reads back the
+# headphone format (e.g. 0x31) instead of 0x4013 and the speakers go silent.
+# A browser on the headphone sink or opening the sound settings is enough.
+#
+# Runs after 90-alsa-restore.rules, so it also wins over a saved "on" state,
+# at boot and whenever mb81-resume-recover reloads the HDA stack.
+# See issue #8.
+ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", ATTRS{id}=="PCH", RUN+="/usr/bin/amixer -c PCH cset name='IEC958 Default PCM Playback Switch' off"

@@ -11,6 +11,9 @@
 #       51-mb81-rawpcm-speaker.conf -> ~/.config/wireplumber/wireplumber.conf.d/
 #           (raw-PCM mode: WirePlumber creates MacBook_Speaker_Raw for device 2
 #            event-driven so it survives the cold-boot timing race)
+#       91-mb81-no-spdif-share.rules -> /etc/udev/rules.d/
+#           (keeps "IEC958 Default PCM Playback Switch" off so the headphone
+#            PCM can't clobber the speaker converter 0x0a; issue #8)
 # plus the suspend/resume recovery (S3 resume re-latches the codec clock; a bound
 # driver cannot clear it, so audio returns silent):
 #       resume_recover.sh + efi_recover.py -> /usr/local/bin/
@@ -79,6 +82,8 @@ if [[ $action == 'remove' ]]; then
     MB81_SKIP_INITRAMFS=1 bash dkms.sh -r || true
     echo "=== removing config files ==="
     rm -f /etc/modprobe.d/mb81-singlecmd.conf
+    rm -f /etc/udev/rules.d/91-mb81-no-spdif-share.rules
+    udevadm control --reload 2>/dev/null || true
     rm -f "$pw_dir/51-macbook81-speaker.conf"
     rm -f "$wp_dir/51-mb81-rawpcm-speaker.conf"
     rm -f "$wp_dir/51-mb81-disable-iec958.conf"   # legacy name (pre raw-PCM)
@@ -90,6 +95,12 @@ fi
 
 echo "=== (B) modprobe.d: single_cmd=1 ==="
 install -m 0644 mb81-singlecmd.conf /etc/modprobe.d/mb81-singlecmd.conf
+
+echo "=== udev: keep IEC958 Default PCM off (speaker converter clobber, #8) ==="
+install -m 0644 91-mb81-no-spdif-share.rules /etc/udev/rules.d/91-mb81-no-spdif-share.rules
+udevadm control --reload 2>/dev/null || true
+# Apply now too, in case the patched driver is already loaded.
+amixer -c PCH cset name='IEC958 Default PCM Playback Switch' off >/dev/null 2>&1 || true
 
 echo "=== PipeWire EQ sink + WirePlumber raw-PCM speaker (user: $real_user) ==="
 install -d -o "$real_user" -g "$real_user" "$pw_dir" "$wp_dir"
