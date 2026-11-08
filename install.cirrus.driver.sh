@@ -44,25 +44,46 @@ hda_dir="$build_dir/hda"
 kernel_src_archive=''
 kernel_src_topdir=''
 
+# Prefer the distro's exact source tree when it is already installed. Ubuntu
+# kernel versions (e.g. 7.0.0-42) share their x.y name with the mainline
+# tarball, so the wget block below would otherwise pull mainline linux-7.0 and
+# compile it against a 7.0.0-42 ABI. The distro tarball is the tree this kernel
+# was actually built from, so use it whenever it is on disk.
+pkg_tarball="/usr/src/linux-source-$kernel_version.tar.bz2"
+if [[ -s $pkg_tarball ]] && tar -tf "$pkg_tarball" >/dev/null 2>&1; then
+    echo "=== using installed distro kernel source $pkg_tarball ==="
+    kernel_src_archive="$pkg_tarball"
+    kernel_src_topdir="$(tar -tf "$kernel_src_archive" 2>/dev/null | head -1 | cut -d/ -f1)"
+    [[ -n $kernel_src_topdir ]] || { echo "could not read $kernel_src_archive...exiting"; exit 1; }
+elif [[ -e $pkg_tarball ]]; then
+    # A zero-byte / truncated tarball (e.g. an interrupted apt download) must
+    # not be mistaken for a usable source tree.
+    echo "WARNING: ignoring unusable $pkg_tarball"
+fi
+
 # attempt to download linux-x.x.x.tar.xz, then linux-x.x.tar.xz, from kernel.org
-if wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P $build_dir; then
-    kernel_src_archive="$build_dir/linux-$kernel_version.tar.xz"
-    kernel_src_topdir="linux-$kernel_version"
-elif wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_short_version.tar.xz" -P $build_dir; then
-    kernel_src_archive="$build_dir/linux-$kernel_short_version.tar.xz"
-    kernel_src_topdir="linux-$kernel_short_version"
+if [[ -z $kernel_src_archive ]]; then
+    if wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P $build_dir; then
+        kernel_src_archive="$build_dir/linux-$kernel_version.tar.xz"
+        kernel_src_topdir="linux-$kernel_version"
+    elif wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_short_version.tar.xz" -P $build_dir; then
+        kernel_src_archive="$build_dir/linux-$kernel_short_version.tar.xz"
+        kernel_src_topdir="linux-$kernel_short_version"
+    fi
 fi
 
 # No mainline tarball (Ubuntu-versioned kernel): use the Ubuntu linux-source pkg.
 if [[ -z $kernel_src_archive ]]; then
     src_pkg="linux-source-$kernel_version"
-    pkg_tarball="/usr/src/$src_pkg.tar.bz2"
     echo "=== kernel.org has no linux-$kernel_version; falling back to Ubuntu $src_pkg ==="
-    # Reuse an already-installed tarball if present; only touch apt when missing.
-    # (An apt-triggered DKMS rebuild already holds the dpkg lock, so pre-installing
-    # linux-source-$ver yourself avoids a self-deadlock in that path.)
-    if [[ ! -f $pkg_tarball ]]; then
-        apt-get install -y "$src_pkg" || { echo "could not install $src_pkg...exiting"; exit 1; }
+    # Reuse an already-installed tarball if present; only touch apt when missing
+    # or unusable (the -s test rules out the zero-byte stub left by an
+    # interrupted download). (An apt-triggered DKMS rebuild already holds the
+    # dpkg lock, so pre-installing linux-source-$ver yourself avoids a
+    # self-deadlock in that path.)
+    if [[ ! -s $pkg_tarball ]]; then
+        [[ -e $pkg_tarball ]] && rm -f "$pkg_tarball"
+        apt-get install -y --reinstall "$src_pkg" || { echo "could not install $src_pkg...exiting"; exit 1; }
     fi
     [[ -f $pkg_tarball ]] || { echo "$pkg_tarball missing after install...exiting"; exit 1; }
     kernel_src_archive="$pkg_tarball"

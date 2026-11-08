@@ -1,0 +1,38 @@
+#!/bin/bash
+# mb81-volume — default-sink volume step with a single, replaced on-screen bubble.
+# Usage: mb81-volume +5 | -5 | mute
+set -u
+
+case "${1:-}" in
+    +*) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${1#+}%+" ;;
+    -*) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${1#-}%-" ;;
+    mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+    *) echo "usage: $0 +5|-5|mute" >&2; exit 2 ;;
+esac
+
+state="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)"   # Volume: 0.55 [MUTED]
+level="$(sed -n 's/^Volume: \([0-9.]*\).*/\1/p' <<<"$state")"
+pct="$(awk -v v="${level:-0}" 'BEGIN { printf "%d", v * 100 + 0.5 }')"
+
+if [[ "$state" == *MUTED* ]]; then
+    title="Muted"; body=""; pct=0; icon=audio-volume-muted
+else
+    title="Volume"; body="${pct}%"
+    case "$pct" in
+        0) icon=audio-volume-muted ;;
+        [1-9]|[1-3][0-9]) icon=audio-volume-low ;;
+        [4-6][0-9]) icon=audio-volume-medium ;;
+        *) icon=audio-volume-high ;;
+    esac
+fi
+
+# Replace the previous bubble instead of stacking a new one on every key repeat.
+# The ID lives in the runtime dir so it is per-user and cleared at logout.
+idfile="${XDG_RUNTIME_DIR:-/tmp}/mb81-volume-notify-$(id -u).id"
+args=(-t 1200 -i "$icon"
+      -h string:x-canonical-private-synchronous:mb81-volume
+      -h "int:value:$pct")
+[[ -s "$idfile" ]] && args+=(-r "$(cat "$idfile")")
+
+id="$(notify-send -p "${args[@]}" "$title" "$body" 2>/dev/null)" && [[ -n "$id" ]] \
+    && printf '%s' "$id" > "$idfile"

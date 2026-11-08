@@ -11,6 +11,9 @@
 #       51-mb81-rawpcm-speaker.conf -> ~/.config/wireplumber/wireplumber.conf.d/
 #           (raw-PCM mode: WirePlumber creates MacBook_Speaker_Raw for device 2
 #            event-driven so it survives the cold-boot timing race)
+#       51-mb81-rawpcm-speaker.lua  -> ~/.config/wireplumber/main.lua.d/
+#           (same rules for WirePlumber 0.4.x, as shipped by Mint 22.x / Ubuntu
+#            24.04; 0.4 has no SPA-JSON .conf support)
 # plus the suspend/resume recovery (S3 resume re-latches the codec clock; a bound
 # driver cannot clear it, so audio returns silent):
 #       resume_recover.sh + efi_recover.py -> /usr/local/bin/
@@ -35,6 +38,7 @@ real_home="$(getent passwd "$real_user" | cut -d: -f6)"
 real_uid="$(id -u "$real_user")"
 pw_dir="$real_home/.config/pipewire/pipewire.conf.d"
 wp_dir="$real_home/.config/wireplumber/wireplumber.conf.d"
+wp_lua_dir="$real_home/.config/wireplumber/main.lua.d"
 
 # Run `systemctl --user` as the invoking user, against their session bus.
 user_systemctl() {
@@ -81,6 +85,7 @@ if [[ $action == 'remove' ]]; then
     rm -f /etc/modprobe.d/mb81-singlecmd.conf
     rm -f "$pw_dir/51-macbook81-speaker.conf"
     rm -f "$wp_dir/51-mb81-rawpcm-speaker.conf"
+    rm -f "$wp_lua_dir/51-mb81-rawpcm-speaker.lua"
     rm -f "$wp_dir/51-mb81-disable-iec958.conf"   # legacy name (pre raw-PCM)
     depmod -a
     refresh_initramfs
@@ -88,15 +93,31 @@ if [[ $action == 'remove' ]]; then
     exit 0
 fi
 
+echo "=== disabling any leftover 'model=generic' for snd-hda-intel ==="
+# A common "fix" for silent Macs is options snd-hda-intel model=generic. It
+# makes snd_hda_codec_configure() set codec->probe_id = HDA_CODEC_ID_GENERIC,
+# so hda_codec_match() then offers the CS4208 *only* to snd-hda-codec-generic:
+# cs420x can never bind, no matter the load order. Strip just that token (other
+# options on the line are kept) and keep a backup.
+while IFS= read -r f; do
+    cp -a "$f" "$f.mb81-bak"
+    sed -i -E 's/(^|[[:space:]])model=generic([[:space:]]|$)/\1\2/' "$f"
+    echo "    cleaned $f (backup: $f.mb81-bak)"
+done < <(grep -lE '^[[:space:]]*options[[:space:]]+snd-hda-intel.*model=generic' /etc/modprobe.d/*.conf 2>/dev/null || true)
+
 echo "=== (B) modprobe.d: single_cmd=1 ==="
 install -m 0644 mb81-singlecmd.conf /etc/modprobe.d/mb81-singlecmd.conf
 
 echo "=== PipeWire EQ sink + WirePlumber raw-PCM speaker (user: $real_user) ==="
-install -d -o "$real_user" -g "$real_user" "$pw_dir" "$wp_dir"
+install -d -o "$real_user" -g "$real_user" "$pw_dir" "$wp_dir" "$wp_lua_dir"
 install -m 0644 -o "$real_user" -g "$real_user" \
     51-macbook81-speaker.conf "$pw_dir/51-macbook81-speaker.conf"
 install -m 0644 -o "$real_user" -g "$real_user" \
     51-mb81-rawpcm-speaker.conf "$wp_dir/51-mb81-rawpcm-speaker.conf"
+# WirePlumber 0.4.x (Mint 22.x / Ubuntu 24.04) ignores the SPA-JSON .conf above
+# and reads Lua snippets from main.lua.d instead; install the 0.4 equivalent too.
+install -m 0644 -o "$real_user" -g "$real_user" \
+    51-mb81-rawpcm-speaker.lua "$wp_lua_dir/51-mb81-rawpcm-speaker.lua"
 # Remove the legacy iec958-disable rule if a previous install left it (its job
 # is now folded into 51-mb81-rawpcm-speaker.conf, which disables device 1).
 rm -f "$wp_dir/51-mb81-disable-iec958.conf"
