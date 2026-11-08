@@ -89,6 +89,16 @@ sudo reboot
 Removes the DKMS package and all config files; the stock in-tree drivers take
 over again on the next boot.
 
+### WirePlumber 0.4 (Linux Mint 22.x, Ubuntu 24.04)
+
+The `.conf` files are SPA-JSON and need WirePlumber 0.5+. Distributions still on
+WirePlumber 0.4 (Mint 22.x / Ubuntu 24.04) read `main.lua.d/*.lua` instead, so
+`install.sh` also installs `51-mb81-rawpcm-speaker.lua`, the 0.4 equivalent of
+the raw-PCM rules (same node names and properties). Both files are installed
+unconditionally; each WirePlumber version reads only the format it understands.
+Check with `dpkg -l wireplumber` if in doubt. See [`MINT.md`](MINT.md) for the
+rest of the Mint 22.x / XFCE checklist (top-row media keys, volume OSD).
+
 ---
 
 ## Verify
@@ -136,6 +146,15 @@ sudo bash resume_recover.sh    # or: sudo /usr/local/bin/mb81-resume-recover
 
 A plain reboot is always a clean fallback.
 
+### Speakers silent, codec named "Cirrus Logic Generic"
+
+Check for a leftover `options snd-hda-intel model=generic` in `/etc/modprobe.d/`:
+that option forces `codec->probe_id = HDA_CODEC_ID_GENERIC`, which makes the
+kernel offer the CS4208 only to `snd-hda-codec-generic`. The patched `cs420x`
+cannot bind in that case, whatever the module load order. `install.sh` strips
+the token automatically (backing the file up as `*.mb81-bak`); to fix it by
+hand, remove `model=generic` and run `sudo update-initramfs -u`.
+
 ---
 
 ## Layout
@@ -151,6 +170,9 @@ Makefile_cs420x / Makefile_cirrus   out-of-tree build makefiles (6.17+ / older)
 mb81-singlecmd.conf            modprobe.d: single_cmd=1 power_save=0   (part B)
 51-macbook81-speaker.conf      PipeWire EQ filter-chain sink
 51-mb81-rawpcm-speaker.conf    WirePlumber raw-PCM speaker node + SPDIF disable
+51-mb81-rawpcm-speaker.lua     same rules for WirePlumber 0.4.x (Mint 22.x / Ubuntu 24.04)
+MINT.md                        Mint 22.x / XFCE notes (media keys, volume OSD)
+mint/mb81-volume               XFCE volume-key helper with on-screen level
 resume_recover.sh              driverless re-heal after suspend (-> /usr/local/bin)
 efi_recover.py                 D3hot->D0 + EFI replay; clears the clock latch
 mb81-resume-recover.service    runs resume_recover on every resume
